@@ -6,14 +6,14 @@ from sentry_sdk.integrations.django import DjangoIntegration
 from datetime import timedelta
 from dotenv import load_dotenv
 
+from django.core.exceptions import DisallowedHost
+
 sentry_sdk.init(
     dsn="https://a3a03f31e0222b04c72b85136cad1350@o4511394095562752.ingest.de.sentry.io/4511394140717136",
     integrations=[DjangoIntegration()],
-    # If you wish to associate users to errors (recommended)
     send_default_pii=True,
-    # Set traces_sample_rate to 1.0 to capture 100%
-    # of transactions for performance monitoring.
     traces_sample_rate=1.0,
+    ignore_errors=[DisallowedHost],
 )
 
 load_dotenv()
@@ -36,9 +36,19 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_BROWSER_XSS_FILTER = True
 X_FRAME_OPTIONS = 'DENY'
 
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
-# Sentry DisallowedHost xatolarini butunlay bartaraf etish uchun asosiy domenlar va IP'ni doim qo'shib qo'yamiz
-for host in ['tadbikor.uz', 'www.tadbikor.uz', 'servicehub.uz', 'www.servicehub.uz', '18.194.40.42']:
+ALLOWED_HOSTS = [h.strip() for h in os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',') if h.strip()]
+# AWS Linux serverida Sentry DisallowedHost xatolarini butunlay bartaraf etish uchun barcha domenlar va IP'larni qo'shamiz
+REQUIRED_HOSTS = [
+    'tadbikor.uz',
+    'www.tadbikor.uz',
+    'api.tadbikor.uz',
+    '.tadbikor.uz',
+    'ec2-18-194-40-42.eu-central-1.compute.amazonaws.com',
+    '18.194.40.42',
+    'localhost',
+    '127.0.0.1',
+]
+for host in REQUIRED_HOSTS:
     if host not in ALLOWED_HOSTS:
         ALLOWED_HOSTS.append(host)
 
@@ -46,8 +56,10 @@ for host in ['tadbikor.uz', 'www.tadbikor.uz', 'servicehub.uz', 'www.servicehub.
 CSRF_TRUSTED_ORIGINS = [
     'https://tadbikor.uz',
     'https://www.tadbikor.uz',
+    'https://api.tadbikor.uz',
     'http://tadbikor.uz',
     'http://www.tadbikor.uz',
+    'http://api.tadbikor.uz',
 ]
 
 AUTHENTICATION_BACKENDS = [
