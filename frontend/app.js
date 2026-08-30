@@ -203,7 +203,11 @@ async function doLogin() {
     }),
   });
   const d = await r.json();
-  if (!r.ok) { showErr(errEl, 'Login yoki parol noto\'g\'ri'); return; }
+  if (!r.ok) { 
+    errEl.innerHTML = 'Login yoki parol noto\'g\'ri.<br><span style="font-size:0.9em;color:var(--text-soft)">Hisob bloklangan bo\'lsa adminga yozing: <a href="https://t.me/Madaminjon01" target="_blank" style="color:var(--primary);text-decoration:underline;">@Madaminjon01</a></span>';
+    errEl.classList.remove('hidden');
+    return; 
+  }
   state.access = d.access; state.refresh = d.refresh;
   localStorage.setItem('access', d.access);
   localStorage.setItem('refresh', d.refresh);
