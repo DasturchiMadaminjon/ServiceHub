@@ -157,6 +157,7 @@ const PAGE_LOADERS = {
   'admin-stats':        loadAdminStats,
   'create-request':     loadCategories,
   'request':            initRequestPage,
+  'tools':              () => {},
 };
 
 let isNavigating = false;
@@ -374,6 +375,15 @@ async function loadProviders(page = 1, ordering = '-rating', categoryId = null) 
     if (searchEl) searchEl.value = ''; 
   } else {
     if (catStatusEl) catStatusEl.classList.add('hidden');
+  }
+
+  const catFiltersEl = document.getElementById('prov-category-filters');
+  if (catFiltersEl && state.allCategories) {
+    let catHtml = `<button class="chip ${!state.providerCategoryId ? 'active' : ''}" onclick="state.providerCategoryId=null; loadProviders(1, '${ordering}')">Barchasi</button>`;
+    state.allCategories.forEach(c => {
+      catHtml += `<button class="chip ${state.providerCategoryId == c.id ? 'active' : ''}" onclick="state.providerCategoryId=${c.id}; loadProviders(1, '${ordering}')">${c.name}</button>`;
+    });
+    catFiltersEl.innerHTML = catHtml;
   }
 
   document.querySelectorAll('.sort-row .chip').forEach(c => {

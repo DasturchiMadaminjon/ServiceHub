@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Kadastr Pro | Universal O'lchash Tizimi</title>
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+    <style>
+        :root {
+            --glass-bg: rgba(15, 23, 42, 0.92);
+            --glass-light: rgba(255, 255, 255, 0.08);
+            --glass-border: rgba(255, 255, 255, 0.18);
+            --primary: #3b82f6;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --text-main: #f8fafc;
+            --text-dim: #94a3b8;
+            --shadow-lg: 0 10px 40px 0 rgba(0, 0, 0, 0.7);
+            --panel-scale: 1;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body, html {
+            height: 100%; width: 100%; overflow: hidden;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            background: #0f172a;
+            touch-action: none;
+        }
+
+        #map { height: 100vh; width: 100vw; background: #1e293b; z-index: 1; }
+
+        .loading_screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            z-index: 9999; transition: opacity 0.5s;
+        }
+        .loading_screen.hidden { opacity: 0; pointer-events: none; }
+        .loader {
+            width: 60px; height: 60px; border: 5px solid rgba(255,255,255,0.2);
+            border-top-color: var(--primary); border-radius: 50%;
+            animation: spin 1s linear infinite; margin-bottom: 20px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .loading_text { color: white; font-size: 1.2rem; font-weight: 600; }
+
+        .top_bar {
+            position: absolute; top: 16px; left: 50%; transform: translateX(-50%);
+            display: flex; gap: 8px; background: var(--glass-bg); backdrop-filter: blur(20px);
+            padding: 6px; border-radius: 24px; border: 1px solid var(--glass-border);
+            z-index: 1000; box-shadow: var(--shadow-lg);
+            max-width: calc(100% - 32px); overflow-x: auto;
+        }
+
+        .mode_btn {
+            background: transparent; border: none; color: var(--text-main);
+            padding: 10px 18px; border-radius: 18px; font-weight: 600;
+            font-size: 0.85rem; cursor: pointer; transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+            white-space: nowrap; display: flex; align-items: center; gap: 6px;
+        }
+        .mode_btn.active {
+            background: var(--primary); box-shadow: 0 4px 16px rgba(59, 130, 246, 0.5);
+        }
+
+        .gps_accuracy {
+            position: absolute; top: 80px; right: 16px;
+            background: var(--glass-bg); backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border); border-radius: 16px;
+            padding: 10px 14px; color: var(--text-main);
+            font-size: 0.75rem; z-index: 999; box-shadow: var(--shadow-lg);
+            display: none;
+        }
+        .gps_accuracy.show { display: block; }
+        .acc_icon {
+            display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+            margin-right: 6px; background: var(--success);
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+        .tools_panel {
+            position: absolute; right: 16px; top: 50%; transform: translateY(-50%);
+            display: flex; flex-direction: column; gap: 10px; z-index: 999;
+        }
+        .tool_btn {
+            width: 48px; height: 48px; border-radius: 50%;
+            background: var(--glass-bg); backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border); color: white;
+            font-size: 1.3rem; display: flex; align-items: center; justify-content: center;
+            cursor: pointer; transition: all 0.3s; box-shadow: var(--shadow-lg);
+        }
+        .tool_btn:active { transform: scale(0.9); }
+        .tool_btn:hover { background: var(--glass-light); }
+        .btn_locate_active { background: var(--primary) !important; box-shadow: 0 0 15px var(--primary); }
+
+        .main_panel_container {
+            position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);
+            width: calc(100% - 32px); max-width: 460px; z-index: 1000;
+            display: flex; flex-direction: column; align-items: center;
+        }
+
+        .main_panel {
+            width: 100%; background: var(--glass-bg); backdrop-filter: blur(28px);
+            border: 1px solid var(--glass-border); border-radius: 28px;
+            padding: 20px; color: var(--text-main); box-shadow: var(--shadow-lg);
+            display: flex; flex-direction: column; gap: 14px;
+            max-height: 70vh; overflow-y: auto;
+            transform: scale(var(--panel-scale));
+            transform-origin: bottom center;
+            transition: transform 0.05s linear;
+            will-change: transform;
+        }
+
+        .tracker_panel {
+            background: rgba(0, 0, 0, 0.4); border-radius: 20px; padding: 16px;
+            border: 1px solid var(--glass-light); text-align: center;
+        }
+        .tracker_stats {
+            display: flex; justify-content: space-around; margin-bottom: 14px;
+            font-size: 0.85rem; color: var(--text-dim);
+        }
+        .tracker_stats span {
+            font-weight: 700; color: var(--text-main); font-size: 1.1rem;
+        }
+
+        .btn_record {
+            width: 100%; padding: 16px; border-radius: 16px; border: none; font-size: 1.1rem; font-weight: 700;
+            color: white; cursor: pointer; transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+            background: linear-gradient(135deg, #10b981, #059669);
+            box-shadow: 0 8px 25px rgba(16, 185, 129, 0.4);
+            display: flex; align-items: center; justify-content: center; gap: 10px;
+        }
+        .btn_record.recording {
+            background: linear-gradient(135deg, #ef4444, #b91c1c);
+            box-shadow: 0 8px 25px rgba(239, 68, 68, 0.5);
+            animation: recordPulse 1.5s infinite;
+        }
+        @keyframes recordPulse {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { transform: scale(1.02); box-shadow: 0 0 0 15px rgba(239, 68, 68, 0); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+
+        .status_badge_container { text-align: center; }
+        .status_badge {
+            padding: 8px 14px; border-radius: 20px; font-size: 0.8rem; font-weight: 600;
+            background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.3);
+            color: var(--primary); display: inline-block;
+        }
+        .status_badge.success { background: rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.3); color: var(--success); }
+        .status_badge.warning { background: rgba(245, 158, 11, 0.15); border-color: rgba(245, 158, 11, 0.3); color: var(--warning); }
+
+        .metric_grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .metric_card { background: rgba(0, 0, 0, 0.4); border-radius: 16px; padding: 14px; border: 1px solid var(--glass-light); }
+        .metric_label { font-size: 0.75rem; color: var(--text-dim); text-transform: uppercase; margin-bottom: 6px; }
+        .metric_value { font-size: 1.8rem; font-weight: 700; color: var(--success); display: flex; align-items: baseline; gap: 4px; }
+        .metric_unit { font-size: 0.9rem; font-weight: 500; color: var(--text-dim); }
+
+        .unit_selector { display: flex; gap: 8px; flex-wrap: wrap; }
+        .unit_btn {
+            flex: 1; min-width: 80px; padding: 10px; background: rgba(255,255,255,0.05);
+            border: 1px solid var(--glass-light); border-radius: 12px; color: var(--text-dim);
+            font-size: 0.8rem; font-weight: 600; cursor: pointer; transition: all 0.3s; text-align: center;
+        }
+        .unit_btn.active { background: var(--success); color: white; border-color: var(--success); box-shadow: 0 0 16px rgba(16, 185, 129, 0.4); }
+        .unit_btn:active { transform: scale(0.96); }
+
+        .details_box {
+            background: rgba(0, 0, 0, 0.3); border-radius: 14px; padding: 14px;
+            max-height: 180px; overflow-y: auto; font-size: 0.8rem;
+        }
+        .perimeter_box { border-left: 3px solid var(--primary); }
+        .box_title { font-size: 0.85rem; font-weight: 600; color: var(--primary); margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+        .list_item { padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.05); color: var(--text-main); }
+        .list_item:last-child { border-bottom: none; }
+        .coord_num {
+            background: var(--primary); color: white; border-radius: 50%;
+            width: 20px; height: 20px; display: inline-flex; align-items: center;
+            justify-content: center; font-weight: 700; font-size: 0.7rem; margin-right: 8px;
+        }
+        .coord_val { color: var(--text-dim); font-family: 'Courier New', monospace; }
+
+        .btn_grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .btn_full { grid-column: span 2; }
+        button.action_btn {
+            border: none; padding: 14px; border-radius: 14px; color: white;
+            font-size: 0.95rem; font-weight: 600; cursor: pointer; transition: all 0.3s;
+        }
+        button.action_btn:active { transform: scale(0.96); }
+        button.action_btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .btn_primary { background: linear-gradient(135deg, #3b82f6, #2563eb); }
+        .btn_success { background: linear-gradient(135deg, #10b981, #059669); }
+        .btn_warning { background: linear-gradient(135deg, #f59e0b, #d97706); }
+        .btn_danger { background: rgba(239, 68, 68, 0.15); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.3); }
+
+        .toast {
+            position: fixed; top: 90px; left: 50%; transform: translateX(-50%) translateY(-20px);
+            background: var(--glass-bg); backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border); color: white; padding: 14px 24px;
+            border-radius: 30px; z-index: 2000; transition: all 0.4s;
+            opacity: 0; pointer-events: none; font-size: 0.9rem; font-weight: 500; box-shadow: var(--shadow-lg);
+        }
+        .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+
+        .modal {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7); backdrop-filter: blur(8px);
+            display: flex; justify-content: center; align-items: center; z-index: 3000;
+            opacity: 0; pointer-events: none; transition: 0.3s;
+        }
+        .modal.active { opacity: 1; pointer-events: all; }
+        .modal_content {
+            background: var(--glass-bg); border: 1px solid var(--glass-border);
+            padding: 24px; border-radius: 24px; width: 90%; max-width: 400px;
+            color: white; box-shadow: var(--shadow-lg);
+            max-height: 80vh; overflow-y: auto;
+        }
+        .modal_title { font-size: 1.4rem; font-weight: 700; margin-bottom: 12px; }
+        .modal_text { color: var(--text-dim); font-size: 0.9rem; margin-bottom: 20px; line-height: 1.6; }
+
+        .live_marker {
+            width: 22px; height: 22px; background: var(--primary);
+            border-radius: 50%; border: 3px solid white; box-shadow: 0 0 20px rgba(59, 130, 246, 0.8);
+            animation: live_pulse 2s infinite;
+        }
+        @keyframes live_pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
+            70% { box-shadow: 0 0 0 20px rgba(59, 130, 246, 0); }
+        }
+        .point_marker {
+            background: var(--primary); color: white; border-radius: 50%;
+            width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; font-weight: 700;
+            border: 2px solid white; box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+        }
+
+        .distance_label {
+            background: rgba(239, 68, 68, 0.95); color: white; padding: 4px 8px;
+            border-radius: 12px; font-size: 0.75rem; font-weight: 700; white-space: nowrap;
+            border: 2px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+        }
+
+        .hidden { display: none !important; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 10px; }
+    </style>
+</head>
+<body>
+
+    <div class="loading_screen" id="loading_screen">
+        <div class="loader"></div>
+        <div class="loading_text">🛰️ Tizim ishga tushmoqda...</div>
+    </div>
+
+    <div class="top_bar">
+        <button class="mode_btn active" id="btn_map_mode">📍 Qo'lda qadash</button>
+        <button class="mode_btn" id="btn_track_mode">🚶‍♂️ Yurib o'lchash</button>
+    </div>
+
+    <div class="gps_accuracy" id="gps_accuracy">
+        <span class="acc_icon"></span><span id="accuracy_text">Aniqlik: --</span>
+    </div>
+
+    <div class="tools_panel">
+        <button class="tool_btn" id="btn_locate" title="Mening joylashuvim">🎯</button>
+        <button class="tool_btn hidden" id="btn_add_point" title="Shu joyni qadash">📍</button>
+        <button class="tool_btn" id="btn_satellite" title="Xarita turi">🌍</button>
+        <button class="tool_btn" id="btn_info" title="Ma'lumot">ℹ️</button>
+    </div>
+
+    <div id="map"></div>
+    <div class="toast" id="toast"></div>
+
+    <div class="main_panel_container" id="pinch_area">
+        <div class="main_panel" id="main_panel">
+            <div class="status_badge_container" id="status_container">
+                <span class="status_badge" id="status_badge">📍 Nuqtani bosib belgilang</span>
+            </div>
+
+            <div class="tracker_panel hidden" id="tracker_panel">
+                <div class="tracker_stats">
+                    <div>Qadamlar: <br><span id="track_count">0</span></div>
+                    <div>Masofa: <br><span id="track_dist">0 m</span></div>
+                </div>
+                <button class="btn_record" id="btn_record">▶ Boshlash</button>
+            </div>
+
+            <div class="metric_grid">
+                <div class="metric_card">
+                    <div class="metric_label">Maydon</div>
+                    <div class="metric_value"><span id="area_value">0.00</span><span class="metric_unit" id="area_unit">m²</span></div>
+                </div>
+                <div class="metric_card">
+                    <div class="metric_label">Perimetr</div>
+                    <div class="metric_value"><span id="perimeter_value">0.00</span><span class="metric_unit">m</span></div>
+                </div>
+            </div>
+
+            <div class="unit_selector">
+                <div class="unit_btn active" data-unit="sqm">m²</div>
+                <div class="unit_btn" data-unit="sotix">Sotix</div>
+                <div class="unit_btn" data-unit="hectare">Gektar</div>
+                <div class="unit_btn" data-unit="acre">Akr</div>
+            </div>
+
+            <div class="details_box perimeter_box hidden" id="perimeter_details">
+                <div class="box_title">📏 Tomonlar Ma'lumoti</div>
+                <div id="sides_list"></div>
+            </div>
+
+            <div class="details_box hidden" id="coords_box">
+                <div class="box_title">🌐 GPS Koordinatalar (WGS84)</div>
+                <div id="coords_list"></div>
+            </div>
+
+            <div class="btn_grid">
+                <button class="action_btn btn_success hidden" id="btn_auto_point">➕ Nuqta</button>
+                <button class="action_btn btn_primary" id="btn_calculate_manual">📐 Hisoblash</button>
+                <button class="action_btn btn_danger" id="btn_clear">🗑️ Tozalash</button>
+                <button class="action_btn btn_warning" id="btn_export">📄 Eksport</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="info_modal">
+        <div class="modal_content">
+            <div class="modal_title">ℹ️ Kadastr Pro</div>
+            <div class="modal_text">
+                <p><strong>Universal Geodezik Tizim</strong></p><br>
+                <p><strong>📍 Qo'lda qadash:</strong> Xaritaga barmoq bilan bosib nuqta qo'ying yoki 'Mening joylashuvim' orqali o'z joyingizni qadang. Hisoblash va Eksport mavjud.</p><br>
+                <p><strong>🚶‍♂️ Yurib o'lchash:</strong> 'Boshlash' tugmasini bosing va maydon chekkasi bo'ylab yuring. Tizim har 2.5 metrda GPS shovqinisiz o'lchaydi.</p><br>
+                <p><strong>👆 Hajm sozlash:</strong> Pastki panelni <b>ikki barmoq bilan qisib (pinch)</b> kattalashtiring yoki kichraytiring.</p>
+            </div>
+            <button class="action_btn btn_primary" style="width:100%" onclick="closeModal()">Yopish</button>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+    <script>
+        window.addEventListener('load', () => {
+            if (typeof L === 'undefined' || typeof turf === 'undefined') {
+                alert('❌ Kutubxonalar yuklanmadi. Internetni tekshiring.'); return;
+            }
+            setTimeout(() => document.getElementById('loading_screen').classList.add('hidden'), 600);
+
+            const STATE = {
+                map: null, points: [], markers: [], polygon: null, polyline: null,
+                liveMarker: null, watchId: null, userLocation: null, accuracy: null,
+                layerType: 'hybrid', unit: 'sqm', areaSqm: 0, perimeterM: 0,
+                mode: 'manual', isTracking: false, trackDistance: 0,
+                distanceLabels: [], scale: 1
+            };
+
+            const UNITS = {
+                sqm: { symbol: 'm²', factor: 1 }, sotix: { symbol: 'sotix', factor: 100 },
+                hectare: { symbol: 'ga', factor: 10000 }, acre: { symbol: 'akr', factor: 4046.86 }
+            };
+
+            const DOM = {
+                btnMapMode: document.getElementById('btn_map_mode'), btnTrackMode: document.getElementById('btn_track_mode'),
+                trackerPanel: document.getElementById('tracker_panel'), statusContainer: document.getElementById('status_container'),
+                statusBadge: document.getElementById('status_badge'), btnRecord: document.getElementById('btn_record'),
+                trackCount: document.getElementById('track_count'), trackDist: document.getElementById('track_dist'),
+                btnLocate: document.getElementById('btn_locate'), btnAddPoint: document.getElementById('btn_add_point'),
+                btnSatellite: document.getElementById('btn_satellite'), btnInfo: document.getElementById('btn_info'),
+                gpsAccuracy: document.getElementById('gps_accuracy'), accuracyText: document.getElementById('accuracy_text'),
+                areaValue: document.getElementById('area_value'), areaUnit: document.getElementById('area_unit'),
+                perimeterValue: document.getElementById('perimeter_value'), perimeterDetails: document.getElementById('perimeter_details'),
+                sidesList: document.getElementById('sides_list'), coordsBox: document.getElementById('coords_box'),
+                coordsList: document.getElementById('coords_list'), btnAutoPoint: document.getElementById('btn_auto_point'),
+                btnCalculateManual: document.getElementById('btn_calculate_manual'), btnClear: document.getElementById('btn_clear'),
+                btnExport: document.getElementById('btn_export'), toast: document.getElementById('toast'),
+                pinchArea: document.getElementById('pinch_area'), mainPanel: document.getElementById('main_panel')
+            };
+
+            const showToast = (msg) => { DOM.toast.textContent = msg; DOM.toast.classList.add('show'); setTimeout(() => DOM.toast.classList.remove('show'), 3500); };
+            window.closeModal = () => document.getElementById('info_modal').classList.remove('active');
+            const formatNumber = (num) => num.toLocaleString('uz-UZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+            const haversineDistance = (lat1, lon1, lat2, lon2) => {
+                const R = 6371000, φ1 = lat1 * Math.PI/180, φ2 = lat2 * Math.PI/180, Δφ = (lat2-lat1) * Math.PI/180, Δλ = (lon2-lon1) * Math.PI/180;
+                const a = Math.sin(Δφ/2)**2 + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ/2)**2;
+                return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            };
+
+            const calculateBearing = (lat1, lon1, lat2, lon2) => {
+                const φ1 = lat1 * Math.PI/180, φ2 = lat2 * Math.PI/180, Δλ = (lon2-lon1) * Math.PI/180;
+                const y = Math.sin(Δλ) * Math.cos(φ2), x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+                return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+            };
+
+            // PINCH TO ZOOM (Fixed & Optimized)
+            let initialDistance = 0, currentScale = 1, ticking = false;
+            const MIN_SCALE = 0.6, MAX_SCALE = 1.5;
+
+            const updateScale = (newScale) => {
+                STATE.scale = Math.max(MIN_SCALE, Math.min(newScale, MAX_SCALE));
+                document.documentElement.style.setProperty('--panel-scale', STATE.scale);
+            };
+
+            DOM.pinchArea.addEventListener('touchstart', (e) => {
+                if (e.touches.length === 2) {
+                    e.preventDefault();
+                    initialDistance = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+                    currentScale = STATE.scale;
+                }
+            }, { passive: false });
+
+            DOM.pinchArea.addEventListener('touchmove', (e) => {
+                if (e.touches.length === 2) {
+                    e.preventDefault();
+                    if (!ticking) {
+                        requestAnimationFrame(() => {
+                            const currentDistance = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+                            if (currentDistance > 0) {
+                                updateScale(currentScale * (currentDistance / initialDistance));
+                            }
+                            ticking = false;
+                        });
+                        ticking = true;
+                    }
+                }
+            }, { passive: false });
+
+            DOM.pinchArea.addEventListener('touchend', (e) => {
+                if (e.touches.length < 2) {
+                    initialDistance = 0;
+                }
+            }, { passive: false });
+
+            // MAP & GPS FUNCTIONS
+            const initializeMap = () => {
+                STATE.map = L.map('map', { center: [41.2995, 69.2401], zoom: 16, zoomControl: false });
+                L.control.zoom({ position: 'topleft' }).addTo(STATE.map);
+                updateMapLayer();
+                STATE.map.on('click', (e) => { if(STATE.mode === 'manual') addPointManual(e.latlng); });
+                forceUserLocation();
+            };
+
+            const updateMapLayer = () => {
+                STATE.map.eachLayer(l => { if (l instanceof L.TileLayer) STATE.map.removeLayer(l); });
+                const urls = { hybrid: 'y', satellite: 's', streets: 'm' };
+                L.tileLayer(`https://mt1.google.com/vt/lyrs=${urls[STATE.layerType]}&x={x}&y={y}&z={z}`, { maxZoom: 22, maxNativeZoom: 20 }).addTo(STATE.map);
+            };
+
+            const forceUserLocation = () => {
+                if (!navigator.geolocation) {
+                    showToast('⚠️ Bu brauzer GPS-ni qo\'llab-quvvatlamaydi');
+                    return;
+                }
+                DOM.btnLocate.classList.add('btn_locate_active');
+                showToast('🛰️ GPS aniqlanmoqda...');
+
+                navigator.geolocation.getCurrentPosition(
+                    (pos) => {
+                        DOM.btnLocate.classList.remove('btn_locate_active');
+                        handlePositionUpdate(pos, true);
+                        showToast('✅ GPS topildi!');
+                    },
+                    (err) => {
+                        DOM.btnLocate.classList.remove('btn_locate_active');
+                        console.warn('GPS xatosi:', err.code, err.message);
+
+                        let errorMsg = '⚠️ GPS olinmadi';
+                        if (err.code === 1) errorMsg = '🔒 Ruxsat yo\'q - Brauzer sozlamalarini tekshiring';
+                        else if (err.code === 2) errorMsg = '📡 Ishonchsiz - GPS signalini tekshiring';
+                        else if (err.code === 3) errorMsg = '⏱️ Vaqt tugadi - Qaytadan urinib ko\'ring';
+
+                        showToast(errorMsg);
+                    },
+                    {
+                        enableHighAccuracy: true,
+                        timeout: 15000,  // 15 sekundga uzaytirdik
+                        maximumAge: 0    // Cache ishlatmayamiz
+                    }
+                );
+            };
+
+            const handlePositionUpdate = (pos, isInitial = false) => {
+                STATE.userLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+                STATE.accuracy = Math.max(pos.coords.accuracy, 0);
+                updateLiveMarker(); updateGPSAccuracy();
+
+                if (isInitial) {
+                    STATE.map.flyTo([STATE.userLocation.lat, STATE.userLocation.lng], 19, { animate: true, duration: 1 });
+                    DOM.btnLocate.classList.remove('btn_locate_active');
+                    if(STATE.mode === 'manual') { DOM.btnAddPoint.classList.remove('hidden'); DOM.btnAutoPoint.classList.remove('hidden'); }
+                    if (!STATE.watchId) startGPSTracking();
+                } else if (STATE.mode === 'track' && STATE.isTracking && STATE.accuracy <= 25) {
+                    const latlng = L.latLng(STATE.userLocation.lat, STATE.userLocation.lng);
+                    if (STATE.points.length === 0) {
+                        addPointTrack(latlng);
+                    } else {
+                        const lastPt = STATE.points[STATE.points.length - 1];
+                        const dist = haversineDistance(lastPt.lat, lastPt.lng, latlng.lat, latlng.lng);
+                        if (dist >= 2.5) {
+                            STATE.trackDistance += dist;
+                            DOM.trackDist.textContent = `${STATE.trackDistance.toFixed(1)} m`;
+                            addPointTrack(latlng);
+                        }
+                    }
+                }
+            };
+
+            const startGPSTracking = () => {
+                if (STATE.watchId) return;
+                STATE.watchId = navigator.geolocation.watchPosition(
+                    (pos) => handlePositionUpdate(pos, false),
+                    (err) => console.warn('GPS watch error:', err),
+                    { enableHighAccuracy: true, timeout: 5000, maximumAge: 2000 }
+                );
+            };
+
+            const stopGPSTracking = () => {
+                if (STATE.watchId) {
+                    navigator.geolocation.clearWatch(STATE.watchId);
+                    STATE.watchId = null;
+                }
+            };
+
+            const updateLiveMarker = () => {
+                if (!STATE.userLocation) return;
+                if (!STATE.liveMarker) {
+                    const icon = L.divIcon({ className: '', html: '<div class="live_marker"></div>', iconSize: [22, 22], iconAnchor: [11, 11] });
+                    STATE.liveMarker = L.marker([STATE.userLocation.lat, STATE.userLocation.lng], { icon, zIndexOffset: 1000 }).addTo(STATE.map);
+                } else STATE.liveMarker.setLatLng([STATE.userLocation.lat, STATE.userLocation.lng]);
+            };
+
+            const updateGPSAccuracy = () => {
+                DOM.gpsAccuracy.classList.add('show'); DOM.accuracyText.textContent = `Aniqlik: ±${STATE.accuracy.toFixed(1)}m`;
+                DOM.gpsAccuracy.querySelector('.acc_icon').style.background = STATE.accuracy < 8 ? 'var(--success)' : STATE.accuracy < 20 ? 'var(--warning)' : 'var(--danger)';
+            };
+
+            const updateDistanceLabels = () => {
+                STATE.distanceLabels.forEach(label => STATE.map.removeLayer(label)); STATE.distanceLabels = [];
+                if (STATE.points.length < 2) return;
+                for (let i = 0; i < STATE.points.length; i++) {
+                    const p1 = STATE.points[i], p2 = STATE.points[(i + 1) % STATE.points.length];
+                    if (i === STATE.points.length - 1 && STATE.points.length < 3) continue;
+                    if (STATE.isTracking && i === STATE.points.length - 1) continue;
+                    const dist = haversineDistance(p1.lat, p1.lng, p2.lat, p2.lng);
+                    const icon = L.divIcon({ className: '', html: `<div class="distance_label">${dist.toFixed(1)}m</div>`, iconSize: [60, 24], iconAnchor: [30, 12] });
+                    const marker = L.marker([(p1.lat + p2.lat)/2, (p1.lng + p2.lng)/2], { icon }).addTo(STATE.map);
+                    STATE.distanceLabels.push(marker);
+                }
+            };
+
+            // POINT MANAGEMENT
+            const addPointManual = (latlng) => {
+                STATE.points.push(latlng);
+                const icon = L.divIcon({ className: '', html: `<div class="point_marker">${STATE.points.length}</div>`, iconSize: [32, 32], iconAnchor: [16, 16] });
+                const markerIdx = STATE.markers.length;
+                const marker = L.marker(latlng, { icon, draggable: true }).addTo(STATE.map);
+                marker.on('dragend', (e) => {
+                    STATE.points[markerIdx] = e.target.getLatLng();
+                    updatePolygon(); updateDistanceLabels(); if(STATE.points.length >= 3) calculateMetricsManual();
+                });
+                STATE.markers.push(marker); updatePolygon(); updateDistanceLabels(); updateStatusBadge(); showToast(`✅ Nuqta ${STATE.points.length} qo'shildi`);
+            };
+
+            const addPointTrack = (latlng) => {
+                STATE.points.push(latlng);
+                const dot = L.circleMarker(latlng, { radius: 4, color: '#ef4444', fillColor: '#ef4444', fillOpacity: 1 }).addTo(STATE.map);
+                STATE.markers.push(dot); DOM.trackCount.textContent = STATE.points.length; updatePolygon(false);
+                if(STATE.points.length >= 3) {
+                    try {
+                        STATE.areaSqm = turf.area(turf.polygon([[...STATE.points.map(p=>[p.lng, p.lat]), [STATE.points[0].lng, STATE.points[0].lat]]]));
+                        STATE.perimeterM = STATE.trackDistance + haversineDistance(STATE.points[STATE.points.length-1].lat, STATE.points[STATE.points.length-1].lng, STATE.points[0].lat, STATE.points[0].lng);
+                        updateDisplayValues();
+                    } catch(err) { console.warn('Calc error', err); }
+                }
+            };
+
+            const addCurrentLocationManual = () => { if (!STATE.userLocation) { forceUserLocation(); return; } addPointManual(L.latLng(STATE.userLocation.lat, STATE.userLocation.lng)); };
+
+            const updatePolygon = (closePolygon = true) => {
+                if (STATE.polygon) STATE.map.removeLayer(STATE.polygon); if (STATE.polyline) STATE.map.removeLayer(STATE.polyline);
+                if (STATE.points.length >= 2) STATE.polyline = L.polyline(STATE.points, { color: (STATE.mode === 'track' ? '#ef4444' : '#3b82f6'), weight: 3, dashArray: (STATE.mode === 'track' && STATE.isTracking) ? '5, 10' : '' }).addTo(STATE.map);
+                if (STATE.points.length >= 3 && (closePolygon || !STATE.isTracking)) STATE.polygon = L.polygon(STATE.points, { color: '#3b82f6', weight: 3, fillColor: '#10b981', fillOpacity: 0.3 }).addTo(STATE.map);
+            };
+
+            const updateStatusBadge = () => {
+                const c = STATE.points.length;
+                DOM.statusBadge.textContent = c === 0 ? '📍 Nuqtani bosib belgilang' : c === 1 ? '🔹 1 nuqta belgilandi' : c === 2 ? '🔹 2 nuqta - Chiziq' : `✅ ${c} nuqta - Polygon`;
+                DOM.statusBadge.className = `status_badge ${c >= 3 ? 'success' : c > 0 ? 'warning' : ''}`;
+            };
+
+            const clearAll = () => {
+                STATE.markers.forEach(m => STATE.map.removeLayer(m));
+                if (STATE.polygon) STATE.map.removeLayer(STATE.polygon); if (STATE.polyline) STATE.map.removeLayer(STATE.polyline);
+                STATE.distanceLabels.forEach(label => STATE.map.removeLayer(label));
+                STATE.markers = []; STATE.points = []; STATE.areaSqm = 0; STATE.perimeterM = 0; STATE.trackDistance = 0; STATE.distanceLabels = [];
+                DOM.trackCount.textContent = '0'; DOM.trackDist.textContent = '0 m'; DOM.perimeterDetails.classList.add('hidden'); DOM.coordsBox.classList.add('hidden');
+                if(STATE.isTracking) toggleTracking(); updateStatusBadge(); updateDisplayValues(); showToast('🗑️ Barchasi tozalandi');
+            };
+
+            // CALCULATIONS & UI
+            const calculateMetricsManual = () => {
+                if (STATE.points.length < 3) { showToast('⚠️ Kamida 3 ta nuqta kerak!'); return; }
+                const coords = STATE.points.map(p => [p.lng, p.lat]); coords.push(coords[0]);
+                STATE.areaSqm = turf.area(turf.polygon([coords]));
+                let perim = 0;
+                for (let i = 0; i < STATE.points.length; i++) perim += haversineDistance(STATE.points[i].lat, STATE.points[i].lng, STATE.points[(i+1)%STATE.points.length].lat, STATE.points[(i+1)%STATE.points.length].lng);
+                STATE.perimeterM = perim;
+                updateDisplayValues(); updateSideDetails(); updateCoordinates(); updateDistanceLabels(); showToast('✅ Hisoblash tugallandi!');
+            };
+
+            const updateDisplayValues = () => {
+                DOM.areaValue.textContent = formatNumber(STATE.areaSqm / UNITS[STATE.unit].factor);
+                DOM.areaUnit.textContent = UNITS[STATE.unit].symbol;
+                DOM.perimeterValue.textContent = formatNumber(STATE.perimeterM);
+            };
+
+            const updateSideDetails = () => {
+                if (STATE.points.length < 2) return;
+                let html = '';
+                for (let i = 0; i < STATE.points.length; i++) {
+                    const p1 = STATE.points[i], p2 = STATE.points[(i+1)%STATE.points.length];
+                    const dist = haversineDistance(p1.lat, p1.lng, p2.lat, p2.lng);
+                    const bear = calculateBearing(p1.lat, p1.lng, p2.lat, p2.lng);
+                    html += `<div class="list_item">Nuqta ${i+1} → ${(i+1)%STATE.points.length+1} <span style="color:var(--text-dim);font-size:0.85em;">| ${formatNumber(dist)}m | ${Math.round(bear)}°</span></div>`;
+                }
+                DOM.sidesList.innerHTML = html; DOM.perimeterDetails.classList.remove('hidden');
+            };
+
+            const updateCoordinates = () => {
+                if (STATE.points.length === 0) return;
+                let html = '';
+                STATE.points.forEach((p, i) => { html += `<div class="list_item"><span class="coord_num">${i+1}</span><span class="coord_val">${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}</span></div>`; });
+                DOM.coordsList.innerHTML = html; DOM.coordsBox.classList.remove('hidden');
+            };
+
+            const toggleTracking = () => {
+                if(!STATE.userLocation) { showToast('⚠️ GPS topilmadi'); return; }
+                STATE.isTracking = !STATE.isTracking;
+                if (STATE.isTracking) {
+                    DOM.btnRecord.innerHTML = '⏹ Tugatish (Yozilmoqda...)'; DOM.btnRecord.classList.add('recording'); showToast('🔴 Yozish boshlandi. Yuring.');
+                    STATE.map.flyTo([STATE.userLocation.lat, STATE.userLocation.lng], 20);
+                } else {
+                    DOM.btnRecord.innerHTML = '▶ Boshlash'; DOM.btnRecord.classList.remove('recording'); updatePolygon(true); updateDistanceLabels(); showToast('✅ O\'lchov yakunlandi');
+                }
+            };
+
+            // EXPORT (PDF with Map Screenshot & Sides)
+            const exportToPDF = async () => {
+                if (STATE.points.length < 3) { showToast('⚠️ Eksport uchun kamida 3 ta nuqta kerak!'); return; }
+                showToast('📸 Hisobot tayyorlanmoqda...');
+
+                try {
+                    // Polygon sifati yaxshi bo'lishi uchun xaritani zoom qilamiz
+                    const originalZoom = STATE.map.getZoom();
+                    const originalCenter = STATE.map.getCenter();
+
+                    // Polygon boundary larga zoom qilamiz
+                    const group = new L.featureGroup(STATE.markers.concat(STATE.polygon || []));
+                    STATE.map.fitBounds(group.getBounds(), { padding: [50, 50] });
+
+                    // Screenshot olish
+                    await new Promise(resolve => setTimeout(resolve, 500)); // Xarita render bo'lishi uchun kutamiz
+
+                    const mapElement = document.getElementById('map');
+                    const canvas = await html2canvas(mapElement, {
+                        useCORS: true,
+                        allowTaint: true,
+                        backgroundColor: '#1e293b',
+                        scale: 2,
+                        ignoreElements: function(el) { return el.classList && (el.classList.contains('leaflet-control') || el.classList.contains('leaflet-zoom-anim')); }
+                    }).catch(err => {
+                        console.warn('Canvas render warning:', err);
+                        return document.createElement('canvas');
+                    });
+
+                    // Asl zoom-ga qaytaramiz
+                    STATE.map.setView(originalCenter, originalZoom);
+
+                    const imgData = canvas.toDataURL('image/jpeg', 0.85);
+                    const doc = new window.jspdf.jsPDF();
+
+                    doc.setFontSize(20); doc.text('KADASTR HISOBOTI', 105, 20, { align: 'center' });
+                    doc.setFontSize(10); doc.text(`Sana: ${new Date().toLocaleDateString('uz-UZ')} ${new Date().toLocaleTimeString('uz-UZ')}`, 20, 35);
+
+                    doc.setFontSize(14); doc.text('ASOSIY MA\'LUMOTLAR', 20, 48);
+                    doc.setFontSize(11);
+                    doc.text(`Maydon: ${(STATE.areaSqm / UNITS[STATE.unit].factor).toFixed(2)} ${UNITS[STATE.unit].symbol}`, 20, 58);
+                    doc.text(`Perimetr: ${STATE.perimeterM.toFixed(2)} m`, 20, 66);
+                    doc.text(`Nuqtalar soni: ${STATE.points.length}`, 20, 74);
+                    doc.text(`Rejim: ${STATE.mode === 'manual' ? 'Qo\'lda qadalgan' : 'Yurib o\'lchangan'}`, 20, 82);
+
+                    // Xarita tasviri qo'shish (agar canvas mavjud bo'lsa)
+                    if (canvas.width > 0 && canvas.height > 0) {
+                        doc.setFontSize(14); doc.text('XARITA TASVIRI', 20, 96);
+                        const imgWidth = 170; const imgHeight = (canvas.height * imgWidth) / canvas.width;
+                        doc.addImage(imgData, 'JPEG', 20, 102, imgWidth, Math.min(imgHeight, 120));
+                    } else {
+                        doc.setFontSize(12); doc.text('📍 Xarita tasviri (screenshotni olishda xatolik)', 20, 96);
+                    }
+
+                    doc.addPage();
+                    doc.setFontSize(14); doc.text('TOMONLAR MA\'LUMOTI', 20, 20);
+                    doc.setFontSize(10); let y = 30;
+
+                    for (let i = 0; i < STATE.points.length; i++) {
+                        if (y > 280) { doc.addPage(); y = 20; }
+                        const p1 = STATE.points[i], p2 = STATE.points[(i+1)%STATE.points.length];
+                        const dist = haversineDistance(p1.lat, p1.lng, p2.lat, p2.lng);
+                        const bear = calculateBearing(p1.lat, p1.lng, p2.lat, p2.lng);
+                        const nextIdx = ((i+1) % STATE.points.length) + 1;
+                        doc.text(`Nuqta ${i+1} - Nuqta ${nextIdx}: ${dist.toFixed(2)}m (${Math.round(bear)} gradus)`, 20, y);
+                        y += 8;
+                    }
+
+                    y += 10; if (y > 260) { doc.addPage(); y = 20; }
+                    doc.setFontSize(14); doc.text('GPS KOORDINATALAR (WGS84)', 20, y);
+                    y += 10; doc.setFontSize(9);
+
+                    STATE.points.forEach((p, i) => {
+                        if(y > 280) { doc.addPage(); y = 20; }
+                        doc.text(`${i+1}. ${p.lat.toFixed(6)} , ${p.lng.toFixed(6)}`, 20, y); y += 7;
+                    });
+
+                    const totalPages = doc.internal.pages.length - 1;
+                    for (let i = 1; i <= totalPages; i++) {
+                        doc.setPage(i); doc.setFontSize(8); doc.text(`Kadastr Pro | Sahifa ${i}/${totalPages}`, 105, 290, { align: 'center' });
+                    }
+
+                    doc.save(`kadastr_${Date.now()}.pdf`); showToast('✅ PDF yuklandi!');
+                } catch (e) { console.error('Export error:', e); showToast('❌ Eksport xatosi'); }
+            };
+
+            const switchMode = (mode) => {
+                if(STATE.isTracking) { showToast('⚠️ Oldin yozishni to\'xtating!'); return; }
+                STATE.mode = mode; clearAll();
+                if (mode === 'manual') {
+                    DOM.btnMapMode.classList.add('active'); DOM.btnTrackMode.classList.remove('active');
+                    DOM.statusContainer.classList.remove('hidden'); DOM.trackerPanel.classList.add('hidden');
+                    DOM.btnCalculateManual.classList.remove('hidden'); DOM.btnExport.classList.remove('hidden');
+                    if(STATE.userLocation) { DOM.btnAddPoint.classList.remove('hidden'); DOM.btnAutoPoint.classList.remove('hidden'); }
+                    showToast('📍 Qo\'lda qadash rejimi');
+                } else {
+                    DOM.btnTrackMode.classList.add('active'); DOM.btnMapMode.classList.remove('active');
+                    DOM.statusContainer.classList.add('hidden'); DOM.trackerPanel.classList.remove('hidden');
+                    DOM.btnCalculateManual.classList.add('hidden'); DOM.btnExport.classList.remove('hidden');
+                    DOM.btnAddPoint.classList.add('hidden'); DOM.btnAutoPoint.classList.add('hidden');
+                    showToast('🚶‍♂️ Yurib o\'lchash rejimi');
+                }
+            };
+
+            // EVENT LISTENERS
+            DOM.btnMapMode.addEventListener('click', () => switchMode('manual'));
+            DOM.btnTrackMode.addEventListener('click', () => switchMode('track'));
+            DOM.btnLocate.addEventListener('click', forceUserLocation);
+            DOM.btnSatellite.addEventListener('click', () => { const t = ['hybrid', 'satellite', 'streets']; STATE.layerType = t[(t.indexOf(STATE.layerType)+1)%3]; updateMapLayer(); });
+            DOM.btnRecord.addEventListener('click', toggleTracking);
+            DOM.btnClear.addEventListener('click', () => { if(confirm('Barcha ma\'lumotlar o\'chirilsinmi?')) clearAll(); });
+            DOM.btnCalculateManual.addEventListener('click', calculateMetricsManual);
+            DOM.btnExport.addEventListener('click', exportToPDF);
+            DOM.btnInfo.addEventListener('click', () => document.getElementById('info_modal').classList.add('active'));
+            DOM.btnAddPoint.addEventListener('click', addCurrentLocationManual);
+            DOM.btnAutoPoint.addEventListener('click', addCurrentLocationManual);
+
+            document.querySelectorAll('.unit_btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    document.querySelectorAll('.unit_btn').forEach(b => b.classList.remove('active'));
+                    e.target.classList.add('active');
+                    STATE.unit = e.target.dataset.unit;
+                    updateDisplayValues();
+                });
+            });
+
+            // Cleanup GPS tracking on page unload
+            window.addEventListener('beforeunload', () => { stopGPSTracking(); });
+
+            initializeMap();
+        });
+    </script>
+</body>
+</html>

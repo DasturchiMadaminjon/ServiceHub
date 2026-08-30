@@ -27,6 +27,8 @@ O‘zbekistonda ishonchli ustani topish ko'p hollarda "og‘zaki tavsiya" yoki i
 - [x] **Portfolio & Skills:** Ustalar o'z ishlarini rasmlar bilan ko'rsatishi va narxlarini belgilashi.
 - [x] **Buyurtmalar tizimi:** So'rov yuborish, holatni kuzatish (Pending → Accepted → In Progress → Completed).
 - [x] **Reyting va Sharhlar:** Xizmat sifatini baholashning shaffof tizimi.
+- [x] **Qo'shimcha Dasturlar:** "Yer o'lchash" (Kalkulyator) va "Xotira mashqi" kabi interaktiv xizmatlar.
+- [x] **Kategoriyalar bo'yicha filter:** Ustalarni ixtisosligiga qarab to'g'ridan-to'g'ri izlash.
 - [x] **Admin Panel:** Moderatsiya va boshqaruv uchun qulay interfeys.
 
 ---

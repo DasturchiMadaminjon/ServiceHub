@@ -262,6 +262,14 @@ class ProviderProfileTest(APITestCase):
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.data['count'], 1)
 
+    def test_provider_filter_by_category(self):
+        cat = make_category('Maxsus Kategoriya')
+        skill = Skill.objects.create(name='Maxsus ish', category=cat)
+        self.provider_user.provider_profile.skills.add(skill)
+        r = self.client.get(f'/api/services/providers/?skills__category={cat.id}')
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.data['count'], 1)
+
     def test_provider_order_by_rating(self):
         p2 = make_provider('prov2', '998903333002')
         p2.provider_profile.rating = 4.5

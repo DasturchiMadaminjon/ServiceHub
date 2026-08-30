@@ -167,6 +167,7 @@ docker-compose exec web python manage.py test accounts services orders -v 2
 | 2026-07-03 | API test — 24 endpoint 100% muvaffaqiyat, .gitignore yangilandi | Madaminjon |
 | 2026-07-03 | Frontend: Double-submit himoyasi, Backend: Deploy script tuzatildi | Madaminjon |
 | 2026-07-28 | Sentry DisallowedHost xatolari bartaraf etildi, ALLOWED_HOSTS va CSRF moslashtirildi, ortiqcha subdomenlar olib tashlandi | Madaminjon |
+| 2026-08-30 | Frontend UI yangilandi: "Qo'shimcha" menyusi (Yer o'lchash, Xotira) va Ustalar sahifasiga Kategoriya filtri qo'shildi | Madaminjon |
 
 ---
-*Oxirgi yangilanish: 2026-07-28*
+*Oxirgi yangilanish: 2026-08-30*

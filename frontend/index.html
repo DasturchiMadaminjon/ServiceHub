@@ -42,6 +42,7 @@
     <a class="logo" href="#" onclick="showPage('home')">⚡ ServiceMJ</a>
     <div class="nav-links" id="nav-links">
       <a href="#" onclick="state.providerCategoryId = null; state.providerPage = 1; showPage('providers')">Ustalar</a>
+      <a href="#" onclick="showPage('tools')">Qo'shimcha</a>
       <span id="nav-client" class="hidden"><a href="#" onclick="showPage('my-requests')">So'rovlarim</a></span>
       <span id="nav-client2" class="hidden"><a href="#" onclick="showPage('create-request')">+ Buyurtma</a></span>
       <span id="nav-provider" class="hidden"><a href="#" onclick="showPage('available-requests')">Buyurtmalar</a></span>
@@ -121,6 +122,7 @@
     <h2>Ustalar</h2>
     <input id="prov-search" type="text" placeholder="Ism yoki ko'nikma bo'yicha qidiring..." oninput="searchProviders()">
   </div>
+  <div id="prov-category-filters" class="filter-row" style="margin-bottom: 1rem; overflow-x: auto; white-space: nowrap; padding-bottom: 5px;"></div>
   <div class="sort-row">
     <span>Saralash:</span>
     <button class="chip active" onclick="loadProviders(1,'-rating')">⭐ Reyting</button>
@@ -135,6 +137,23 @@
 <div id="page-provider-detail" class="page hidden">
   <button class="btn btn-sm btn-outline back-btn" onclick="showPage('providers')">← Orqaga</button>
   <div id="provider-detail-content"></div>
+</div>
+
+<!-- ═══════════════ TOOLS (QO'SHIMCHA) ═══════════════ -->
+<div id="page-tools" class="page hidden">
+  <div class="page-header">
+    <h2>Qo'shimcha Dasturlar</h2>
+  </div>
+  <div class="cards-grid">
+    <div class="card" onclick="window.open('/geo-metric-92a207.html', '_blank')" style="cursor:pointer; text-align:center; padding: 2rem;">
+      <h3 style="margin-bottom: 1rem; color: var(--primary)">📐 Yer o'lchash</h3>
+      <p style="color: var(--text-soft)">Yer maydonini o'lchash va hisoblash uchun maxsus dastur</p>
+    </div>
+    <div class="card" onclick="window.open('/neuromind_ultimate_v3.html', '_blank')" style="cursor:pointer; text-align:center; padding: 2rem;">
+      <h3 style="margin-bottom: 1rem; color: var(--primary)">🧠 Xotirani rivojlantirish</h3>
+      <p style="color: var(--text-soft)">Xotira va diqqatni mashq qildirish uchun maxsus dastur</p>
+    </div>
+  </div>
 </div>
 
 <!-- ═══════════════ MY REQUESTS (client) ═══════════════ -->
